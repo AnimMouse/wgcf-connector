@@ -1,4 +1,5 @@
 #!/bin/sh
+set -eu
 dbus-daemon --system
 /bin/warp-svc &
 sleep 5s
@@ -26,3 +27,7 @@ Endpoint = $(jq -r .endpoints[0].v4 < /var/lib/cloudflare-warp/conf.json)
 #Endpoint = $(jq -r .endpoints[3].v4 < /var/lib/cloudflare-warp/conf.json)
 #Endpoint = $(jq -r .endpoints[3].v6 < /var/lib/cloudflare-warp/conf.json)
 EOL
+if [ "$(jq -r .public_key < /var/lib/cloudflare-warp/conf.json)" != "bmXOC+F1FxEMF9dyiK2H5/1SUtzH0JuVo51h2wPfgyo=" ]; then
+  echo "Error: Got MASQUE instead of WireGuard. Make sure you have a device profile set to WireGuard."
+  exit 1
+fi
