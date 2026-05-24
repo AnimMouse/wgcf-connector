@@ -19,7 +19,7 @@ jobs:
         
       - name: Get Cloudflare WARP latest version
         id: cloudflare-warp
-        run: echo version=$(curl -s https://pkg.cloudflareclient.com/dists/bookworm/main/binary-amd64/Packages | awk '/^Version:/ {print $2}') >> $GITHUB_OUTPUT
+        run: echo version=$(curl -s https://pkg.cloudflareclient.com/dists/trixie/main/binary-amd64/Packages | awk '/^Version:/ {print $2}') >> $GITHUB_OUTPUT
         
       - name: Update Cloudflare WARP version
         run: sed -i "s/^ARG VERSION=.*/ARG VERSION=$version/" Dockerfile
