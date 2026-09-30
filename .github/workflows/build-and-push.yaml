@@ -10,6 +10,14 @@ on:
       - wgcf-connector.sh
   workflow_dispatch:
 
+env:
+  tags: |
+    type=semver,pattern={{version}}
+    type=semver,pattern={{major}}.{{minor}}
+    type=semver,pattern={{major}}
+    type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') && !contains(github.ref, '-') }}
+    type=edge,branch=main
+    
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -51,6 +59,8 @@ jobs:
         uses: docker/metadata-action@v6
         with:
           images: ${{ env.image }}
+          flavor: latest=false
+          tags: ${{ env.tags }}
 
       - name: Build and push image by digest
         id: build
@@ -128,12 +138,7 @@ jobs:
         with:
           images: ${{ env.image }}
           flavor: latest=false
-          tags: |
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=semver,pattern={{major}}
-            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') && !contains(github.ref, '-') }}
-            type=edge,branch=main
+          tags: ${{ env.tags }}
 
       - name: Push image tags
         working-directory: digests
