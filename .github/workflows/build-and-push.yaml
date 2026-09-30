@@ -66,12 +66,14 @@ jobs:
   test:
     needs: build
     strategy:
+      fail-fast: false
       matrix:
         runner: [ubuntu-latest, ubuntu-24.04-arm]
     runs-on: ${{ matrix.runner }}
     steps:
       - name: Test image
         run: |
+          image=${image,,}
           rc=0
           docker run --rm "$image" || rc=$?
           [ $rc -eq 2 ] || { echo "::error::Expected usage error without a token"; exit 1; }
