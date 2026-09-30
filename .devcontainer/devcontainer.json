@@ -1,0 +1,14 @@
+{
+  "name": "wgcf-connector",
+  "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
+  "features": {
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {},
+    "ghcr.io/devcontainers/features/github-cli:1": {},
+    "ghcr.io/devcontainers/features/node:1": {},
+    "ghcr.io/anthropics/devcontainer-features/claude-code:1.0": {}
+  },
+  "mounts": [
+    "source=claude-${devcontainerId},target=/home/vscode/.claude,type=volume"
+  ],
+  "postCreateCommand": "sudo chown -R $(id -u):$(id -g) ~/.claude && sudo chown -R $(id -u):$(id -g) \"$(npm prefix -g)/lib/node_modules/@anthropic-ai\""
+}
