@@ -25,6 +25,17 @@ This program uses the `warp-cli` Linux client, installs it inside the Docker con
 docker run --rm -v $(pwd):/app/output ghcr.io/animmouse/wgcf-connector <token>
 ```
 
+### Image tags
+| Tag | Use |
+| --- | --- |
+| `latest` | Newest release. Recommended for most users. |
+| `1` | Newest 1.x.x release, without breaking changes. |
+| `1.0.0` | This exact release, never changes. |
+| `edge` | Latest commit on `main`, may be broken. |
+
+New Cloudflare WARP versions are released automatically as patch versions. Old WARP versions may eventually be rejected by Cloudflare, so avoid pinning an exact version for long.\
+See [releases](https://github.com/AnimMouse/wgcf-connector/releases) for the changes in each version.
+
 ### Build image locally
 ```
 docker build -t wgcf-connector .

@@ -31,7 +31,7 @@ Still to do:
 - [x] Retag v1.0.0 and create a GitHub release. Done 2026-10-01. `imagetools create` wrapped the image in a manifest list, so `:1.0.0` has digest `sha256:89d71c11…8858`; it points to the original `sha256:6d295244…a4a`. The dev shell is zsh, so write `${img}:latest` (zsh reads `$img:l` as a modifier).
 - [x] Update `build-and-push.yaml`: pushing a `v*` tag publishes `:X.Y.Z`, `:X.Y`, `:X` and `:latest` (use `docker/metadata-action`). Pushes to `main` publish only `:edge`. Add the OCI `revision` label.
 - [x] **Decided:** how WARP auto-bumps are versioned: `auto-update.yaml` cuts a patch release automatically (v1.0.1, v1.0.2, …) so every image has an immutable version.
-- [ ] Explain the tags in the README: `:latest` for most users, `:1` to stay on major version 1, `:1.0.0` to pin exactly.
+- [x] Explain the tags in the README: `:latest` for most users, `:1` to stay on major version 1, `:1.0.0` to pin exactly.
 
 ### 2. Fixes (release as v1.0.1+)
 
@@ -39,24 +39,24 @@ Guiding principle: you don't need to handle every error path, but the tool must 
 
 Latent bugs, highest priority first:
 
-- [ ] **`wgcf-connector.sh`: errors inside the heredoc are ignored.** `set -e` doesn't stop on a failing `$(...)` inside a heredoc (verified in dash and bash), and `jq -r` prints `null` for missing fields. The result can be `PrivateKey = ` or `Endpoint = null` with exit 0. Fix: read each value once with `jq -er` into variables, check they're non-empty and not `null`, then write the file.
-- [ ] **`wgcf-connector.sh`: `sleep 5s` is a race.** Poll instead, with a timeout:
+- [x] **`wgcf-connector.sh`: errors inside the heredoc are ignored.** `set -e` doesn't stop on a failing `$(...)` inside a heredoc (verified in dash and bash), and `jq -r` prints `null` for missing fields. The result can be `PrivateKey = ` or `Endpoint = null` with exit 0. Fix: read each value once with `jq -er` into variables, check they're non-empty and not `null`, then write the file.
+- [x] **`wgcf-connector.sh`: `sleep 5s` is a race.** Poll instead, with a timeout:
   `until warp-cli --accept-tos status` for daemon readiness, then `until jq -e .public_key conf.json` after `connector new`.
 - [x] **`auto-update.yaml`: can commit `ARG VERSION=`.** If `curl -s` fails, the version is empty and a broken Dockerfile gets committed. Fix: use `curl -fsS` and check the version is non-empty before `sed`.
-- [ ] **The MASQUE check runs after the `.conf` is written**, leaving an unusable file behind. Move it before the write.
+- [x] **The MASQUE check runs after the `.conf` is written**, leaving an unusable file behind. Move it before the write.
 
 Hardening:
 
-- [ ] Add `umask 077` and `chown "$(stat -c %u:%g /app/output)"` on the output file. It currently ends up `root:root 644` and contains the private key.
-- [ ] Print a usage message when no token is given; `set -u` currently gives a cryptic error.
-- [ ] Generate the extra endpoint lines with one jq expression over `.endpoints[]`, so a missing endpoint doesn't produce `null`.
-- [ ] The hard-coded peer public key check (`bmXOC+F1…`) breaks if Cloudflare rotates the key. Check the tunnel protocol field in `conf.json` if one exists, or change the error message to "unexpected peer key, possibly MASQUE".
+- [x] Add `umask 077` and `chown "$(stat -c %u:%g /app/output)"` on the output file. It currently ends up `root:root 644` and contains the private key.
+- [x] Print a usage message when no token is given; `set -u` currently gives a cryptic error.
+- [x] Generate the extra endpoint lines with one jq expression over `.endpoints[]`, so a missing endpoint doesn't produce `null`.
+- [x] The hard-coded peer public key check (`bmXOC+F1…`) is replaced by `conf.json` fields. Verified with a real token on 2026-10-01: `warp-cli connector new` first writes MASQUE keys (`tunnel_key_data.tunnel_type: masque`, `secp256r1`), then about 2s later switches `conf.json` and `reg.json` to WireGuard keys when `policy.tunnel_protocol` is `wireguard`. The old `sleep 5s` only worked by luck. The script now waits until `tunnel_key_data.tunnel_type == policy.tunnel_protocol` and then requires `wireguard`.
 
 Polish:
 
 - [ ] Build arm64 too (`buildx --platform linux/amd64,linux/arm64`). Cloudflare publishes a trixie arm64 package at the same version.
 - [ ] Replace `wget` with `ADD https://pkg.cloudflareclient.com/pubkey.gpg …`, and replace `| tee` with `>`.
-- [ ] Use `warp-svc` consistently instead of mixing it with `/bin/warp-svc`.
+- [x] Use `warp-svc` consistently instead of mixing it with `/bin/warp-svc`.
 
 ### 3. New repo `wgcf-mesh`: call the registration API directly
 
