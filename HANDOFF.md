@@ -54,7 +54,7 @@ Hardening:
 
 Polish:
 
-- [x] Build arm64 too (`buildx --platform linux/amd64,linux/arm64`). Cloudflare publishes a trixie arm64 package at the same version. Done with QEMU on an amd64 runner; a `test` job runs the pushed image on native `ubuntu-latest` and `ubuntu-24.04-arm` runners, because `warp-svc` fails under QEMU user emulation (`NetworkInfoError`, EOPNOTSUPP on network info). `auto-update.yaml` checks that both architectures have the same WARP version.
+- [x] Build arm64 too (`buildx --platform linux/amd64,linux/arm64`). Cloudflare publishes a trixie arm64 package at the same version. Done with native `ubuntu-latest` and `ubuntu-24.04-arm` build jobs that push by digest and test the image; a `merge` job tags both digests only if both pass. QEMU took the build from about 90s to 420s, and `warp-svc` fails under QEMU user emulation anyway (`NetworkInfoError`, EOPNOTSUPP on network info). `auto-update.yaml` checks that both architectures have the same WARP version.
 - [x] Replace `wget` with `ADD https://pkg.cloudflareclient.com/pubkey.gpg …`, and replace `| tee` with `>`. `ADD` needs `--chmod=644`, remote files default to 600.
 - [x] Use `warp-svc` consistently instead of mixing it with `/bin/warp-svc`.
 

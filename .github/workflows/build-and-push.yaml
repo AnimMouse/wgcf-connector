@@ -9,75 +9,64 @@ on:
       - Dockerfile
       - wgcf-connector.sh
   workflow_dispatch:
-  
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
-  
+
 jobs:
   build:
-    outputs:
-      image: ghcr.io/${{ github.repository }}@${{ steps.build.outputs.digest }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux/amd64
+            runner: ubuntu-latest
+          - platform: linux/arm64
+            runner: ubuntu-24.04-arm
     permissions:
       packages: write
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.runner }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
         with:
           persist-credentials: false
-          
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v4
-        
+
+      - name: Set image name
+        run: echo "image=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
-        
+
       - name: Login to Container Registry
         uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
-          
-      - name: Generate image tags and labels
+
+      - name: Generate image labels
         id: meta
         uses: docker/metadata-action@v6
         with:
-          images: ghcr.io/${{ github.repository }}
-          flavor: latest=false
-          tags: |
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=semver,pattern={{major}}
-            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') && !contains(github.ref, '-') }}
-            type=edge,branch=main
-            
-      - name: Build and push image
+          images: ${{ env.image }}
+
+      - name: Build and push image by digest
         id: build
         uses: docker/build-push-action@v7
         with:
           context: .
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
+          platforms: ${{ matrix.platform }}
           labels: ${{ steps.meta.outputs.labels }}
-          
-  test:
-    needs: build
-    strategy:
-      fail-fast: false
-      matrix:
-        runner: [ubuntu-latest, ubuntu-24.04-arm]
-    runs-on: ${{ matrix.runner }}
-    steps:
+          outputs: type=image,name=${{ env.image }},push-by-digest=true,name-canonical=true,push=true
+
       - name: Test image
         run: |
-          image=${image,,}
           rc=0
-          docker run --rm "$image" || rc=$?
+          docker run --rm "$image@$digest" || rc=$?
           [ $rc -eq 2 ] || { echo "::error::Expected usage error without a token"; exit 1; }
-          docker run --rm --entrypoint sh "$image" -c '
+          docker run --rm --entrypoint sh "$image@$digest" -c '
             dbus-daemon --system
             warp-svc > /dev/null 2>&1 &
             i=0
@@ -89,4 +78,72 @@ jobs:
             warp-cli --accept-tos connector new eyJhIjoiaW52YWxpZCJ9 2>&1 | grep -q "Failed to parse WARP Connector token"' ||
             { echo "::error::warp-svc did not start or warp-cli did not reject an invalid token"; exit 1; }
         env:
-          image: ${{ needs.build.outputs.image }}
+          digest: ${{ steps.build.outputs.digest }}
+
+      - name: Save digest
+        run: |
+          mkdir digests
+          touch "digests/${digest#sha256:}"
+          echo "platform=${platform//\//-}" >> "$GITHUB_ENV"
+        env:
+          digest: ${{ steps.build.outputs.digest }}
+          platform: ${{ matrix.platform }}
+
+      - name: Upload digest
+        uses: actions/upload-artifact@v7
+        with:
+          name: digest-${{ env.platform }}
+          path: digests/*
+          retention-days: 1
+
+  merge:
+    needs: build
+    permissions:
+      packages: write
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set image name
+        run: echo "image=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
+
+      - name: Download digests
+        uses: actions/download-artifact@v8
+        with:
+          pattern: digest-*
+          path: digests
+          merge-multiple: true
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Login to Container Registry
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate image tags
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ env.image }}
+          flavor: latest=false
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') && !contains(github.ref, '-') }}
+            type=edge,branch=main
+
+      - name: Push image tags
+        working-directory: digests
+        run: |
+          mapfile -t tags < <(jq -r '.tags[] | "--tag=" + .' <<< "$DOCKER_METADATA_OUTPUT_JSON")
+          sources=()
+          for digest in *; do sources+=("$image@sha256:$digest"); done
+          docker buildx imagetools create "${tags[@]}" "${sources[@]}"
+
+      - name: Inspect image
+        run: docker buildx imagetools inspect "$image:$version"
+        env:
+          version: ${{ steps.meta.outputs.version }}
