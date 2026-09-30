@@ -19,7 +19,10 @@ jobs:
         
       - name: Get Cloudflare WARP latest version
         id: cloudflare-warp
-        run: echo version=$(curl -s https://pkg.cloudflareclient.com/dists/trixie/main/binary-amd64/Packages | awk '/^Version:/ {print $2}') >> $GITHUB_OUTPUT
+        run: |
+          version=$(curl -fsS https://pkg.cloudflareclient.com/dists/trixie/main/binary-amd64/Packages | awk '/^Version:/ {print $2}')
+          [ -n "$version" ] || { echo "::error::Could not get Cloudflare WARP version"; exit 1; }
+          echo "version=$version" >> "$GITHUB_OUTPUT"
         
       - name: Update Cloudflare WARP version
         run: sed -i "s/^ARG VERSION=.*/ARG VERSION=$version/" Dockerfile
@@ -34,8 +37,23 @@ jobs:
           default_author: github_actions
           message: 'chore: Update Cloudflare WARP to ${{ steps.cloudflare-warp.outputs.version }}'
           
+      - name: Create patch release
+        id: release
+        if: steps.add-and-commit.outputs.committed == 'true'
+        run: |
+          latest=$(gh release view --json tagName -q .tagName)
+          [[ $latest =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::Latest release $latest is not vX.Y.Z"; exit 1; }
+          IFS=. read -r major minor patch <<< "${latest#v}"
+          tag=v$major.$minor.$((patch + 1))
+          gh release create "$tag" --target "$sha" --title "$tag" --notes "Update Cloudflare WARP to $version"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          sha: ${{ steps.add-and-commit.outputs.commit_long_sha }}
+          version: ${{ steps.cloudflare-warp.outputs.version }}
+          
       - name: Build and push image
         if: steps.add-and-commit.outputs.committed == 'true'
-        run: gh workflow run build-and-push.yaml
+        run: gh workflow run build-and-push.yaml --ref ${{ steps.release.outputs.tag }}
         env:
           GITHUB_TOKEN: ${{ github.token }}

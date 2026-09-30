@@ -28,9 +28,9 @@ Decisions so far:
 
 Still to do:
 
-- [ ] Retag v1.0.0 (commands above) and create a GitHub release.
-- [ ] Update `build-and-push.yaml`: pushing a `v*` tag publishes `:X.Y.Z`, `:X.Y`, `:X` and `:latest` (use `docker/metadata-action`). Pushes to `main` publish only `:edge`. Add the OCI `revision` label.
-- [ ] **Open decision:** how WARP auto-bumps are versioned. Recommended: `auto-update.yaml` cuts a patch release automatically (v1.0.1, v1.0.2, …) so every image has an immutable version. The alternative is rebuilding the floating tags in place.
+- [x] Retag v1.0.0 and create a GitHub release. Done 2026-10-01. `imagetools create` wrapped the image in a manifest list, so `:1.0.0` has digest `sha256:89d71c11…8858`; it points to the original `sha256:6d295244…a4a`. The dev shell is zsh, so write `${img}:latest` (zsh reads `$img:l` as a modifier).
+- [x] Update `build-and-push.yaml`: pushing a `v*` tag publishes `:X.Y.Z`, `:X.Y`, `:X` and `:latest` (use `docker/metadata-action`). Pushes to `main` publish only `:edge`. Add the OCI `revision` label.
+- [x] **Decided:** how WARP auto-bumps are versioned: `auto-update.yaml` cuts a patch release automatically (v1.0.1, v1.0.2, …) so every image has an immutable version.
 - [ ] Explain the tags in the README: `:latest` for most users, `:1` to stay on major version 1, `:1.0.0` to pin exactly.
 
 ### 2. Fixes (release as v1.0.1+)
@@ -42,7 +42,7 @@ Latent bugs, highest priority first:
 - [ ] **`wgcf-connector.sh`: errors inside the heredoc are ignored.** `set -e` doesn't stop on a failing `$(...)` inside a heredoc (verified in dash and bash), and `jq -r` prints `null` for missing fields. The result can be `PrivateKey = ` or `Endpoint = null` with exit 0. Fix: read each value once with `jq -er` into variables, check they're non-empty and not `null`, then write the file.
 - [ ] **`wgcf-connector.sh`: `sleep 5s` is a race.** Poll instead, with a timeout:
   `until warp-cli --accept-tos status` for daemon readiness, then `until jq -e .public_key conf.json` after `connector new`.
-- [ ] **`auto-update.yaml`: can commit `ARG VERSION=`.** If `curl -s` fails, the version is empty and a broken Dockerfile gets committed. Fix: use `curl -fsS` and check the version is non-empty before `sed`.
+- [x] **`auto-update.yaml`: can commit `ARG VERSION=`.** If `curl -s` fails, the version is empty and a broken Dockerfile gets committed. Fix: use `curl -fsS` and check the version is non-empty before `sed`.
 - [ ] **The MASQUE check runs after the `.conf` is written**, leaving an unusable file behind. Move it before the write.
 
 Hardening:
