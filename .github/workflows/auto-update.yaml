@@ -22,6 +22,8 @@ jobs:
         run: |
           version=$(curl -fsS https://pkg.cloudflareclient.com/dists/trixie/main/binary-amd64/Packages | awk '/^Version:/ {print $2}')
           [ -n "$version" ] || { echo "::error::Could not get Cloudflare WARP version"; exit 1; }
+          arm64_version=$(curl -fsS https://pkg.cloudflareclient.com/dists/trixie/main/binary-arm64/Packages | awk '/^Version:/ {print $2}')
+          [ "$arm64_version" = "$version" ] || { echo "::error::Cloudflare WARP arm64 version $arm64_version does not match amd64 version $version"; exit 1; }
           echo "version=$version" >> "$GITHUB_OUTPUT"
         
       - name: Update Cloudflare WARP version

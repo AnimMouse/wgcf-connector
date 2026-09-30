@@ -16,6 +16,8 @@ concurrency:
   
 jobs:
   build:
+    outputs:
+      image: ghcr.io/${{ github.repository }}@${{ steps.build.outputs.digest }}
     permissions:
       packages: write
     runs-on: ubuntu-latest
@@ -25,6 +27,9 @@ jobs:
         with:
           persist-credentials: false
           
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v4
+        
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
         
@@ -49,9 +54,37 @@ jobs:
             type=edge,branch=main
             
       - name: Build and push image
+        id: build
         uses: docker/build-push-action@v7
         with:
           context: .
+          platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          
+  test:
+    needs: build
+    strategy:
+      matrix:
+        runner: [ubuntu-latest, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - name: Test image
+        run: |
+          rc=0
+          docker run --rm "$image" || rc=$?
+          [ $rc -eq 2 ] || { echo "::error::Expected usage error without a token"; exit 1; }
+          docker run --rm --entrypoint sh "$image" -c '
+            dbus-daemon --system
+            warp-svc > /dev/null 2>&1 &
+            i=0
+            until warp-cli --accept-tos status > /dev/null 2>&1; do
+              i=$((i + 1))
+              [ $i -lt 30 ] || { echo "warp-svc did not start"; exit 1; }
+              sleep 1
+            done
+            warp-cli --accept-tos connector new eyJhIjoiaW52YWxpZCJ9 2>&1 | grep -q "Failed to parse WARP Connector token"' ||
+            { echo "::error::warp-svc did not start or warp-cli did not reject an invalid token"; exit 1; }
+        env:
+          image: ${{ needs.build.outputs.image }}

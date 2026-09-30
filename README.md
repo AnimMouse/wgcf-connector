@@ -34,6 +34,7 @@ docker run --rm -v $(pwd):/app/output ghcr.io/animmouse/wgcf-connector <token>
 | `edge` | Latest commit on `main`, may be broken. |
 
 New Cloudflare WARP versions are released automatically as patch versions. Old WARP versions may eventually be rejected by Cloudflare, so avoid pinning an exact version for long.\
+Images are available for `linux/amd64` and `linux/arm64`.\
 See [releases](https://github.com/AnimMouse/wgcf-connector/releases) for the changes in each version.
 
 ### Build image locally
